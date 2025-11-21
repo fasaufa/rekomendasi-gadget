@@ -2,147 +2,211 @@ import streamlit as st
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+import time
 
 # ==========================================
-# 1. KONFIGURASI HALAMAN (UI/UX)
+# 1. KONFIGURASI HALAMAN & CSS (THE MAGIC)
 # ==========================================
 st.set_page_config(
-    page_title="Sistem Rekomendasi Gadget",
-    page_icon="📱",
+    page_title="GadgetMatch.AI - Skripsi",
+    page_icon="🤖",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS untuk mempercantik tampilan
+# CSS Kustom untuk Tampilan "Mahal"
 st.markdown("""
 <style>
-    .main-header {font-size: 30px; font-weight: bold; color: #2e86c1;}
-    .sub-header {font-size: 20px; color: #555;}
-    .card {
-        background-color: #f9f9f9;
-        padding: 15px;
-        border-radius: 10px;
-        border-left: 5px solid #2e86c1;
+    /* Latar Belakang Header */
+    .main-header {
+        font-size: 40px;
+        font-weight: 700;
+        color: #1E88E5;
+        text-align: center;
         margin-bottom: 10px;
-        box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+    }
+    .sub-header {
+        font-size: 18px;
+        color: #666;
+        text-align: center;
+        margin-bottom: 30px;
+    }
+    
+    /* Desain Kartu Hasil */
+    .review-card {
+        background-color: #ffffff;
+        padding: 20px;
+        border-radius: 15px;
+        border-left: 6px solid #1E88E5;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+        transition: transform 0.2s;
+    }
+    .review-card:hover {
+        transform: scale(1.02);
+        box-shadow: 0 8px 12px rgba(0,0,0,0.15);
+    }
+    
+    /* Badge Skor */
+    .score-badge {
+        background-color: #e3f2fd;
+        color: #1565c0;
+        padding: 5px 10px;
+        border-radius: 20px;
+        font-weight: bold;
+        font-size: 14px;
+        display: inline-block;
+        margin-bottom: 10px;
+    }
+    
+    /* Highlight Keyword */
+    .highlight {
+        background-color: #fff59d;
+        padding: 0 5px;
+        border-radius: 3px;
     }
 </style>
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. FUNGSI LOAD DATA & MODEL
+# 2. LOAD DATA & MODEL (BACKEND)
 # ==========================================
 @st.cache_resource
-def load_data_and_model():
+def load_data():
     try:
-        # Load Data Bersih
-        # Pastikan file 'gadget_clean.csv' ada di satu folder dengan file ini
         df = pd.read_csv('gadget_clean.csv')
         df['clean_text'] = df['clean_text'].fillna('')
-        
-        # Definisi Stopwords (Sama seperti di Colab)
-        stopwords_indo = [
-            'dan', 'yang', 'di', 'itu', 'ini', 'ke', 'dari', 'ada', 'buat', 'yg', 'mau',
-            'ga', 'gak', 'aku', 'sama', 'kalo', 'lagi', 'bisa', 'karena', 'jadi', 'apa',
-            'tapi', 'suka', 'udah', 'banget', 'ya', 'dia', 'kita', 'untuk', 'dengan',
-            'pada', 'atau', 'adalah', 'saya', 'mereka', 'kan', 'juga', 'aja', 'kalo',
-            'kalau', 'langsung', 'banyak', 'tp', 'dr', 'bgt', 'sdh', 'udh', 'nih', 'sih',
-            'kok', 'deh', 'masih', 'biar', 'tetap', 'pun', 'doang', 'nya'
-        ]
-
-        # Melatih Model TF-IDF
-        tfidf = TfidfVectorizer(stop_words=stopwords_indo)
-        tfidf_matrix = tfidf.fit_transform(df['clean_text'])
-        
-        # Menghitung Cosine Similarity
-        cosine_sim = cosine_similarity(tfidf_matrix, tfidf_matrix)
-        
-        return df, cosine_sim
+        return df
     except FileNotFoundError:
-        return None, None
+        return None
 
-# Memanggil fungsi load data
-df, cosine_sim = load_data_and_model()
+@st.cache_resource
+def build_model(df):
+    stopwords_indo = [
+        'dan', 'yang', 'di', 'itu', 'ini', 'ke', 'dari', 'ada', 'buat', 'yg', 'mau',
+        'ga', 'gak', 'aku', 'sama', 'kalo', 'lagi', 'bisa', 'karena', 'jadi', 'apa',
+        'tapi', 'suka', 'udah', 'banget', 'ya', 'dia', 'kita', 'untuk', 'dengan',
+        'pada', 'atau', 'adalah', 'saya', 'mereka', 'kan', 'juga', 'aja', 'kalo',
+        'kalau', 'langsung', 'banyak', 'tp', 'dr', 'bgt', 'sdh', 'udh', 'nih', 'sih',
+        'kok', 'deh', 'masih', 'biar', 'tetap', 'pun', 'doang', 'nya'
+    ]
+    tfidf = TfidfVectorizer(stop_words=stopwords_indo)
+    tfidf_matrix = tfidf.fit_transform(df['clean_text'])
+    cosine_sim = cosine_similarity(tfidf_matrix, tfidf_matrix)
+    return df, cosine_sim, tfidf_matrix
+
+# Load Process
+df = load_data()
 
 # ==========================================
-# 3. TAMPILAN SIDEBAR
+# 3. SIDEBAR (PROFIL AUTHOR)
 # ==========================================
 with st.sidebar:
-    st.header("ℹ️ Tentang Aplikasi")
-    st.info(
-        """
-        Aplikasi ini adalah implementasi **Sistem Rekomendasi** menggunakan metode 
-        **Content-Based Filtering**.
-        
-        Sistem menganalisis kemiripan teks antar review gadget di Twitter.
-        """
-    )
+    st.markdown("<h2 style='text-align: center;'>👨‍🎓 Author</h2>", unsafe_allow_html=True)
+    # Ganti URL ini dengan foto profil Anda sendiri jika mau
+    st.markdown("<div style='text-align: center;'><img src='https://cdn-icons-png.flaticon.com/512/3135/3135715.png' width='100'></div>", unsafe_allow_html=True)
+    st.markdown("<h3 style='text-align: center;'>Mahasiswa SI</h3>", unsafe_allow_html=True)
+    
     st.write("---")
-    st.write("**Teknologi:**")
-    st.code("Python\nStreamlit\nScikit-Learn\nPandas")
+    st.success("✅ **Status Sistem:** Online")
+    st.info("📅 **Last Update:** Nov 2025")
+    
     st.write("---")
-    st.caption("Dibuat untuk Skripsi Mahasiswa Sistem Informasi")
+    st.caption("Skripsi Sistem Informasi\nUniversitas Amikom Yogyakarta")
 
 # ==========================================
-# 4. HALAMAN UTAMA
+# 4. HALAMAN UTAMA (DASHBOARD)
 # ==========================================
-st.markdown('<p class="main-header">📱 Pencari Review Gadget Cerdas</p>', unsafe_allow_html=True)
-st.markdown('<p class="sub-header">Temukan gadget yang cocok berdasarkan review jujur netizen.</p>', unsafe_allow_html=True)
-st.divider()
 
-# Cek apakah data ada
+# Header Keren
+st.markdown('<div class="main-header">📱 GadgetMatch AI</div>', unsafe_allow_html=True)
+st.markdown('<div class="sub-header">Sistem Rekomendasi Gadget Cerdas Berbasis Content-Based Filtering</div>', unsafe_allow_html=True)
+
 if df is None:
-    st.error("⚠️ File 'gadget_clean.csv' tidak ditemukan!")
-    st.warning("Silakan upload file 'gadget_clean.csv' ke folder yang sama dengan file app.py ini.")
+    st.error("⚠️ Data tidak ditemukan! Harap upload 'gadget_clean.csv'.")
     st.stop()
 
-# Input Pencarian
-col1, col2 = st.columns([3, 1])
-with col1:
-    keyword = st.text_input("Ketik kebutuhanmu (Misal: Samsung kamera jernih, iPhone baterai awet)", "")
-with col2:
-    st.write("") # Spasi kosong
-    st.write("") 
-    cari_btn = st.button("🔍 Cari Rekomendasi", use_container_width=True)
+# Metrics Bar (Statistik Data)
+col_m1, col_m2, col_m3 = st.columns(3)
+with col_m1:
+    st.metric("Total Review", f"{len(df)} Data")
+with col_m2:
+    st.metric("Bahasa", "Indonesia (ID)")
+with col_m3:
+    st.metric("Metode", "TF-IDF + Cosine")
 
-# Logika Pencarian
-if cari_btn:
-    if not keyword:
-        st.toast("⚠️ Masukkan kata kunci dulu dong!")
-    else:
-        # Proses pencarian
-        keyword_lower = keyword.lower()
+st.write("---")
+
+# Load Model
+df, cosine_sim, tfidf_matrix = build_model(df)
+
+# Kolom Pencarian (Lebih Besar)
+col_search, col_btn = st.columns([4, 1])
+with col_search:
+    keyword = st.text_input("", placeholder="🔍 Ketik kebutuhanmu... (Contoh: HP gaming murah, Kamera jernih)", label_visibility="collapsed")
+with col_btn:
+    tombol_cari = st.button("Cari Rekomendasi", type="primary", use_container_width=True)
+
+# ==========================================
+# 5. LOGIKA HASIL & UI CARD
+# ==========================================
+if tombol_cari and keyword:
+    keyword_lower = keyword.lower()
+    
+    with st.spinner('🤖 Menguraikan kata kunci & mencari kemiripan...'):
+        time.sleep(0.5) # Efek dramatis sedikit
+        
         hasil = df[df['clean_text'].str.contains(keyword_lower)]
         
         if len(hasil) == 0:
-            st.error(f"Maaf, tidak ada review tentang '{keyword}'. Coba kata lain.")
+            st.warning(f"🤔 Hmm, tidak menemukan review tentang **'{keyword}'**. Coba kata kunci yang lebih umum.")
         else:
-            # Ambil patokan pertama
+            # Ambil Patokan
             idx = hasil.index[0]
             tweet_patokan = df.iloc[idx]['full_text']
             
-            st.success("✅ Review ditemukan! Berikut rekomendasinya:")
-            
-            # Tampilkan Patokan
-            with st.expander("Lihat Review Basis Pencarian", expanded=True):
-                st.write(f"**Review Asal:** \"{tweet_patokan}\"")
+            # Tampilkan Patokan dengan Style Alert
+            st.markdown(f"""
+            <div style="background-color: #e8f5e9; padding: 15px; border-radius: 10px; border: 1px solid #c8e6c9; margin-bottom: 20px;">
+                <strong>🎯 Basis Pencarian:</strong><br>"{tweet_patokan}"
+            </div>
+            """, unsafe_allow_html=True)
 
-            # Hitung skor kemiripan
+            # Hitung Skor
             sim_scores = list(enumerate(cosine_sim[idx]))
             sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
             top_5 = sim_scores[1:6]
 
-            # Tampilkan Hasil 5 Teratas
-            st.subheader("⭐ 5 Review Gadget Paling Mirip:")
+            st.subheader("✨ Top 5 Rekomendasi Paling Relevan")
             
+            # Tampilkan Kartu
             for i, skor in top_5:
                 tweet_mirip = df.iloc[i]['full_text']
                 persen = skor * 100
                 
-                # Tampilan Kartu
+                # Logika Warna Badge
+                if persen > 30:
+                    warna_badge = "#d1e7dd" # Hijau Muda
+                    teks_warna = "#0f5132"
+                    label = "Sangat Mirip"
+                elif persen > 15:
+                    warna_badge = "#fff3cd" # Kuning/Oranye
+                    teks_warna = "#856404"
+                    label = "Cukup Mirip"
+                else:
+                    warna_badge = "#f8d7da" # Merah Muda
+                    teks_warna = "#721c24"
+                    label = "Agak Mirip"
+
+                # HTML Injection untuk Kartu Keren
                 st.markdown(f"""
-                <div class="card">
-                    <h4>Kemiripan: <span style="color:green">{persen:.1f}%</span></h4>
-                    <p>"{tweet_mirip}"</p>
+                <div class="review-card">
+                    <span style="background-color: {warna_badge}; color: {teks_warna}; padding: 5px 10px; border-radius: 15px; font-size: 12px; font-weight: bold;">
+                        {label} ({persen:.1f}%)
+                    </span>
+                    <p style="margin-top: 10px; font-size: 16px; line-height: 1.6;">"{tweet_mirip}"</p>
                 </div>
                 """, unsafe_allow_html=True)
+
+st.write("")
+st.markdown("<center style='color: #999; font-size: 12px;'>Made with ❤️ using Streamlit for Undergraduate Thesis</center>", unsafe_allow_html=True)
