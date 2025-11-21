@@ -8,7 +8,7 @@ import time
 # 1. KONFIGURASI HALAMAN & CSS (THE MAGIC)
 # ==========================================
 st.set_page_config(
-    page_title="GadgetMatch.AI - Skripsi",
+    page_title="GadgetMatch.AI",
     page_icon="🤖",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -112,7 +112,7 @@ with st.sidebar:
     st.info("📅 **Last Update:** Nov 2025")
     
     st.write("---")
-    st.caption("Skripsi Sistem Informasi\nUniversitas Amikom Yogyakarta")
+    st.caption("Rekomendasi smartphone terpercaya")
 
 # ==========================================
 # 4. HALAMAN UTAMA (DASHBOARD)
@@ -210,3 +210,4 @@ if tombol_cari and keyword:
 
 st.write("")
 st.markdown("<center style='color: #999; font-size: 12px;'>Made with ❤️ using Streamlit for Undergraduate Thesis</center>", unsafe_allow_html=True)
+
